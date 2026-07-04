@@ -20,16 +20,14 @@ async def test_normalize_payload_preserves_empty_sections(monkeypatch):
         "phone": "1234567890",
         "linkedin": "",
         "summary": "",
-        "skills": {
-            "programming_languages": ["Python"],
-            "soft_skills": []
-        },
+        "skills": [],
         "education": [],
         "experience": [],
-        "internships": [],
         "achievements": [],
         "certifications": [],
-        "projects": []
+        "projects": [],
+        "hobbies": [],
+        "additional_info": "",
     }
 
     result = parser._normalize_payload(payload)
@@ -39,8 +37,10 @@ async def test_normalize_payload_preserves_empty_sections(monkeypatch):
     assert result.phone == "1234567890"
     assert result.linkedin == ""
     assert result.summary == ""
-    assert result.internships == []
+    assert result.skills == []
+    assert result.experience == []
     assert result.projects == []
+    assert result.additional_info == ""
 
 
 def test_normalize_payload_extracts_values_from_alternate_keys():
@@ -48,38 +48,31 @@ def test_normalize_payload_extracts_values_from_alternate_keys():
 
     payload = {
         "full_name": "Jane Doe",
-        "skills": {
-            "programming_languages": ["Python"],
-            "web_technologies": ["HTML"],
-            "frameworks": ["FastAPI"],
-            "databases": ["PostgreSQL"],
-            "tools": ["Git"],
-            "computer_science": ["Data Structures"],
-            "machine_learning": ["PyTorch"],
-            "soft_skills": ["Communication"]
-        },
+        "skills": ["Python", "HTML", "FastAPI", "PostgreSQL", "Git", "Communication"],
         "projects": [
             {
                 "name": "Resume Parser",
                 "summary": "Built a document parser",
-                "tech_stack": ["Python", "FastAPI"]
+                "tech_stack": ["Python", "FastAPI"],
             }
         ],
         "education": [
             {
                 "school": "MIT",
                 "degree": "B.S.",
-                "major": "Computer Science"
+                "major": "Computer Science",
+                "start_date": "2019",
+                "end_date": "2023",
             }
         ],
-        "internships": [
+        "experience": [
             {
                 "organization": "OpenAI",
                 "position": "Research Intern",
                 "period": "Summer 2023",
-                "description": "- Built a resume parser\n- Improved model accuracy by 20%"
+                "description": "- Built a resume parser\n- Improved model accuracy by 20%",
             }
-        ]
+        ],
     }
 
     result = parser._normalize_payload(payload)
@@ -89,16 +82,39 @@ def test_normalize_payload_extracts_values_from_alternate_keys():
     assert result.projects[0].technologies == ["Python", "FastAPI"]
     assert result.education[0].institution == "MIT"
     assert result.education[0].degree == "B.S."
-    assert result.education[0].specialization == "Computer Science"
-    assert result.internships[0].company == "OpenAI"
-    assert result.internships[0].role == "Research Intern"
-    assert result.internships[0].duration == "Summer 2023"
-    assert result.internships[0].description == ["Built a resume parser", "Improved model accuracy by 20%"]
-    assert result.skills.programming_languages == ["Python"]
-    assert result.skills.web_technologies == ["HTML"]
-    assert result.skills.frameworks == ["FastAPI"]
-    assert result.skills.databases == ["PostgreSQL"]
-    assert result.skills.tools == ["Git"]
-    assert result.skills.computer_science == ["Data Structures"]
-    assert result.skills.machine_learning == ["PyTorch"]
-    assert result.skills.soft_skills == ["Communication"]
+    assert result.education[0].field_of_study == "Computer Science"
+    assert result.education[0].start_date == "2019"
+    assert result.education[0].end_date == "2023"
+    assert result.experience[0].organization == "OpenAI"
+    assert result.experience[0].position == "Research Intern"
+    assert result.experience[0].duration == "Summer 2023"
+    assert result.experience[0].description == [
+        "Built a resume parser",
+        "Improved model accuracy by 20%",
+    ]
+    assert result.skills == [
+        "Python",
+        "HTML",
+        "FastAPI",
+        "PostgreSQL",
+        "Git",
+        "Communication",
+    ]
+
+
+def test_normalize_education_reads_field_of_study():
+    parser = ParserService()
+
+    payload = {
+        "education": [
+            {
+                "institution": "Stanford",
+                "degree": "M.S.",
+                "field_of_study": "Artificial Intelligence",
+            }
+        ],
+    }
+
+    result = parser._normalize_payload(payload)
+
+    assert result.education[0].field_of_study == "Artificial Intelligence"

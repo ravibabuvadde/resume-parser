@@ -14,10 +14,9 @@ from app.schemas import (
     AchievementResponse,
     CertificationResponse,
     EducationResponse,
-    InternshipResponse,
+    ExperienceResponse,
     ProjectResponse,
     ResumeParseResponse,
-    SkillsResponse,
 )
 from app.utils import ensure_string, ensure_string_list
 
@@ -88,21 +87,329 @@ class ParserService:
             system_instruction="You are an expert resume parser. Return valid JSON only.",
         )
 
-        prompt = (
-            "Extract only these fields from the resume: full_name, email, phone, linkedin, summary, skills, education, internships, projects, certifications, achievements, hobbies. "
-            "Return valid JSON only. Ignore all other sections (e.g. languages, volunteer work, interests, publications, references, extracurricular, etc.). "
-            "Do not omit any keys. If a field is missing, use an empty string for string values and an empty array for array values. "
-            "Do not skip internships or projects. Extract internships and projects even when there is only one entry or when the section is small. "
-            "If a section exists in the resume, populate every relevant field that can be found. Only use empty strings or empty arrays when the information is genuinely absent. "
-            "Look for common alternate labels such as school/major for education, organization/position for internships, and name/summary/tech_stack/repo for projects. "
-            "Categorize skills into programming_languages, web_technologies, frameworks, databases, tools, computer_science, machine_learning, and soft_skills. "
-            "For internships, capture the duration and include the full description as an array of bullet points, preserving every bullet from the resume. "
-            "Identify projects from headings such as Projects, Academic Projects, Personal Projects, Major Projects, Capstone Project, or Relevant Projects. "
-            "For each project include only project_name, description, technologies, and duration. Do not include database, cloud, github, live_demo, role, team_size, highlights, responsibilities, or outcomes. "
-            "For each achievement include title and type. For each certification include name and issuer. "
-            "For the linkedin field, extract the full URL (e.g. linkedin.com/in/...). If only the word 'LinkedIn' appears without a URL, set it to an empty string. "
-            "For each education entry, extract the cgpa or gpa or percentage if present. "
-            "Never fabricate or hallucinate any data. If information is not present in the resume, use empty strings or empty arrays. "
+        prompt = ("""
+            Extract resume information and return ONLY valid JSON.
+
+            Follow this EXACT schema. Do not add, remove, or rename any fields.
+
+            {
+            "full_name": "",
+            "email": "",
+            "phone": "",
+            "linkedin": "",
+            "summary": "",
+            "skills": [],
+            "education": [
+                {
+                "institution": "",
+                "degree": "",
+                "field_of_study": "",
+                "start_date": "",
+                "end_date": "",
+                "cgpa": ""
+                }
+            ],
+            "experience": [
+                {
+                "organization": "",
+                "position": "",
+                "duration": "",
+                "description": []
+                }
+            ],
+            "projects": [
+                {
+                "project_name": "",
+                "description": [],
+                "technologies": [],
+                "duration": ""
+                }
+            ],
+            "certifications": [
+                {
+                "name": "",
+                "issuer": ""
+                }
+            ],
+            "achievements": [
+                {
+                "title": "",
+                "description": ""
+                }
+            ],
+            "hobbies": [],
+            "additional_info": ""
+            }
+
+            GENERAL RULES
+
+            - Return JSON only.
+            - Output must be directly parseable using json.loads().
+            - Do not wrap the response inside markdown.
+            - Do not include explanations.
+            - Do not include comments.
+            - Do not output null.
+            - Do not output None.
+            - Do not output N/A.
+            - Use empty strings ("") for missing string values.
+            - Use empty arrays ([]) for missing arrays.
+            - Every top-level key must always be present.
+            - Do not invent, infer, estimate, or hallucinate information.
+            - Only extract information explicitly present in the resume.
+            - If information is genuinely unavailable, return empty values.
+            - Preserve the order of entries exactly as they appear in the resume.
+
+            CONTACT INFORMATION
+
+            - Extract the first valid full name found in the resume.
+            - Extract the first valid email address.
+            - Extract the first valid phone number.
+            - Remove unnecessary spaces in phone numbers.
+            - Preserve country codes if present.
+            - LinkedIn must contain a complete URL.
+            - Examples:
+            - https://linkedin.com/in/johndoe
+            - linkedin.com/in/johndoe
+            - If only the word "LinkedIn" appears without a URL, return an empty string.
+
+            SUMMARY
+
+            Extract professional summary, profile summary, objective, career objective, or about section if present.
+
+            SKILLS
+
+            Extract all explicitly mentioned skills into a single array.
+
+            Rules:
+            - skills must always be an array
+            - remove duplicates
+            - preserve capitalization
+            - do not categorize
+            - do not infer skills
+            - include only explicitly mentioned skills
+
+            EDUCATION
+
+            Education may appear under headings such as:
+
+            Education
+            Academic Background
+            Academics
+            Qualification
+            Qualifications
+            Schooling
+            Education Details
+
+            Common labels include:
+
+            University
+            College
+            Institute
+            School
+            Degree
+            Course
+            Program
+            Branch
+            Major
+            Specialization
+            Field of Study
+
+            Extract:
+
+            - institution
+            - degree
+            - field_of_study
+            - start_date
+            - end_date
+            - cgpa
+
+            For cgpa:
+            Extract CGPA, GPA, percentage, or score if present.
+
+            Preserve dates exactly as written.
+
+            Examples:
+
+            Jan 2023
+            January 2023
+            2020-2024
+            2020 – 2024
+            Present
+            Current
+
+            EXPERIENCE
+
+            Experience may appear under:
+
+            Experience
+            Experience
+            Experience
+            Work Experience
+            Professional Experience
+            Industrial Training
+            Summer Experience
+            Research Experience
+            Trainee Experience
+
+            Extract:
+
+            - organization
+            - position
+            - duration
+            - description
+
+            Rules:
+
+            - Preserve all bullet points.
+            - Description must always be an array.
+            - Include every bullet exactly as found.
+            - Do not summarize.
+            - Do not merge multiple experience entries.
+            - Do not omit experience entries even if only one exists.
+
+            PROJECTS
+
+            Projects may appear under:
+
+            Projects
+            Project
+            Academic Projects
+            Personal Projects
+            Relevant Projects
+            Capstone Project
+            Capstone
+            Major Project
+            Minor Project
+            Research Projects
+            Final Year Project
+
+            Extract only:
+
+            - project_name
+            - description
+            - technologies
+            - duration
+
+            Rules:
+
+            - Description must always be an array.
+            - Technologies must be an array.
+            - Include only explicitly mentioned technologies.
+            - Do not infer technologies.
+            - Preserve descriptions as closely as possible.
+            - Do not omit projects even if there is only one.
+            - Do not merge multiple projects.
+
+            Never include:
+
+            database
+            cloud
+            github
+            repo
+            repository
+            live_demo
+            website
+            role
+            team_size
+            responsibilities
+            outcomes
+            highlights
+            achievements
+
+            CERTIFICATIONS
+
+            Certifications may appear under:
+
+            Certifications
+            Certificates
+            Courses
+            Training
+            Credentials
+            Professional Certifications
+
+            Extract:
+
+            - name
+            - issuer
+
+            Only include certifications explicitly mentioned.
+
+            ACHIEVEMENTS
+
+            Achievements may appear under:
+
+            Achievements
+            Awards
+            Honors
+            Recognition
+            Accomplishments
+            Scholarships
+            Positions of Responsibility
+
+            Extract:
+
+            - title
+            - description
+
+            HOBBIES
+
+            Hobbies may appear under:
+
+            Hobbies
+            Interests
+            Activities
+            Personal Interests
+
+            Extract only personal hobbies and interests.
+
+            Ignore professional interests.
+
+            ADDITIONAL INFORMATION
+
+            Extract remaining relevant information that does not belong to any predefined category.
+
+            Examples:
+            - portfolio links
+            - website
+            - publications
+            - patents
+            - memberships
+            - hackathons
+            - extracurricular activities
+            - languages known
+
+            Return as plain text.
+
+            If absent return "".
+
+            SECTION DETECTION
+
+            Sections may appear:
+
+            - in uppercase
+            - in lowercase
+            - bolded
+            - underlined
+            - in tables
+            - in columns
+            - abbreviated
+            - inline with other text
+
+            Recognize sections regardless of formatting.
+
+            FINAL CONSTRAINTS
+
+            - Do not fabricate information.
+            - Do not guess missing values.
+            - Do not create additional keys.
+            - Do not rename keys.
+            - Do not skip experience entries.
+            - Do not skip projects.
+            - Do not skip education entries.
+            - Do not skip certifications.
+            - Do not skip achievements.
+            - Maintain exact field names.
+            - Return only valid JSON."""
             "Only extract the fields listed above. Ignore everything else in the resume."
         )
 
@@ -147,30 +454,6 @@ class ParserService:
         raise ValueError("Unsupported file type")
 
     def _normalize_payload(self, payload: dict[str, Any]) -> ResumeParseResponse:
-        skills_payload = payload.get("skills", {}) if isinstance(payload.get("skills"), dict) else {}
-
-        def _skill_list(*keys: str) -> list[str]:
-            for key in keys:
-                if isinstance(skills_payload, dict):
-                    value = skills_payload.get(key)
-                    if value is not None:
-                        normalized = ensure_string_list(value)
-                        if normalized:
-                            return normalized
-                value = payload.get(key)
-                normalized = ensure_string_list(value)
-                if normalized:
-                    return normalized
-            return []
-
-        programming_languages = _skill_list("programming_languages")
-        web_technologies = _skill_list("web_technologies")
-        frameworks = _skill_list("frameworks")
-        databases = _skill_list("databases")
-        tools = _skill_list("tools", "tools_platforms")
-        computer_science = _skill_list("computer_science", "computer_science_fundamentals")
-        machine_learning = _skill_list("machine_learning")
-        soft_skills = _skill_list("soft_skills")
         def _coalesce(*values: Any) -> str:
             for value in values:
                 if value is None:
@@ -236,33 +519,61 @@ class ParserService:
 
         def _normalize_education(item: dict[str, Any]) -> EducationResponse:
             degree_value = _coalesce(item.get("degree"), item.get("qualification"))
-            specialization_value = _coalesce(item.get("specialization"), item.get("field"), item.get("major"))
-            if not degree_value and specialization_value:
-                degree, specialization = _split_degree_and_specialization(specialization_value)
+            field_of_study_value = _coalesce(
+                item.get("field_of_study"),
+                item.get("specialization"),
+                item.get("field"),
+                item.get("major"),
+            )
+            if not degree_value and field_of_study_value:
+                degree, field_of_study = _split_degree_and_specialization(field_of_study_value)
                 if degree:
                     degree_value = degree
-                    specialization_value = specialization
+                    field_of_study_value = field_of_study
                 else:
                     degree_value = ""
-                    specialization_value = specialization_value
-            elif degree_value and not specialization_value:
-                degree, specialization = _split_degree_and_specialization(degree_value)
-                if degree and specialization:
+                    field_of_study_value = field_of_study_value
+            elif degree_value and not field_of_study_value:
+                degree, field_of_study = _split_degree_and_specialization(degree_value)
+                if degree and field_of_study:
                     degree_value = degree
-                    specialization_value = specialization
+                    field_of_study_value = field_of_study
             return EducationResponse(
                 institution=_coalesce(item.get("institution"), item.get("school"), item.get("university")),
                 degree=degree_value,
-                specialization=specialization_value,
+                field_of_study=field_of_study_value,
+                start_date=_coalesce(item.get("start_date"), item.get("start")),
+                end_date=_coalesce(item.get("end_date"), item.get("end")),
                 cgpa=_coalesce(item.get("cgpa"), item.get("gpa")),
             )
 
-        def _normalize_internship(item: dict[str, Any]) -> InternshipResponse:
-            return InternshipResponse(
-                company=_coalesce(item.get("company"), item.get("organization"), item.get("company_name")),
-                role=_coalesce(item.get("role"), item.get("position"), item.get("title")),
-                duration=_coalesce(item.get("duration"), item.get("period"), item.get("timespan")),
-                description=_normalize_description(item.get("description")),
+        def _normalize_experience(
+            item: dict[str, Any]
+        ) -> ExperienceResponse:
+
+            return ExperienceResponse(
+
+                organization=_coalesce(
+                    item.get("organization"),
+                    item.get("company"),
+                    item.get("company_name")
+                ),
+
+                position=_coalesce(
+                    item.get("position"),
+                    item.get("role"),
+                    item.get("title")
+                ),
+
+                duration=_coalesce(
+                    item.get("duration"),
+                    item.get("period"),
+                    item.get("timespan")
+                ),
+
+                description=_normalize_description(
+                    item.get("description")
+                ),
             )
 
         def _normalize_project(item: dict[str, Any]) -> ProjectResponse:
@@ -286,30 +597,44 @@ class ParserService:
             phone=ensure_string(payload.get("phone")),
             linkedin=ensure_string(payload.get("linkedin")),
             summary=ensure_string(payload.get("summary") or payload.get("objective")),
-            skills=SkillsResponse(
-                programming_languages=programming_languages,
-                web_technologies=web_technologies,
-                frameworks=frameworks,
-                databases=databases,
-                tools=tools,
-                computer_science=computer_science,
-                machine_learning=machine_learning,
-                soft_skills=soft_skills,
-            ),
+            skills=ensure_string_list(payload.get("skills")),
             education=[
                 _normalize_education(item)
                 for item in payload.get("education", [])
                 if isinstance(item, dict)
             ],
-            internships=[
-                _normalize_internship(item)
-                for item in payload.get("internships", [])
-                if isinstance(item, dict)
+            experience=[
+
+                _normalize_experience(item)
+
+                for item in payload.get(
+                    "experience",
+                    []
+                )
+
+                if isinstance(
+                    item,
+                    dict
+                )
+
             ],
             achievements=[
                 AchievementResponse(
-                    title=ensure_string(item.get("title") or item.get("name") or item.get("description")),
-                    type=ensure_string(item.get("type") or item.get("category") or "General"),
+
+                    title=ensure_string(
+
+                        item.get("title")
+
+                        or item.get("name")
+
+                    ),
+
+                    description=ensure_string(
+
+                        item.get("description")
+
+                    )
+
                 )
                 for item in payload.get("achievements", [])
                 if isinstance(item, dict)
@@ -328,4 +653,10 @@ class ParserService:
                 if isinstance(item, dict)
             ],
             hobbies=ensure_string_list(payload.get("hobbies")),
+            additional_info=ensure_string(
+                payload.get(
+                    "additional_info"
+                )
+            ),
         )
+    

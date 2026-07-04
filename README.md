@@ -46,6 +46,60 @@ The API will be available at:
 - `/docs` for Swagger UI
 - `/redoc` for ReDoc
 
+## AWS Lambda deployment
+
+The app runs on AWS Lambda via [Mangum](https://mangum.fastapiexpert.com/) (ASGI adapter) and [AWS SAM](https://docs.aws.amazon.com/serverless-application-model/).
+
+### Prerequisites
+
+- [AWS CLI](https://aws.amazon.com/cli/) configured with credentials
+- [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
+- Docker (used by SAM to build the Lambda package)
+
+### Deploy
+
+1. Copy the example SAM config and set your Gemini API key:
+
+   ```bash
+   cp samconfig.toml.example samconfig.toml
+   ```
+
+   Edit `samconfig.toml` and replace `REPLACE_ME` in `parameter_overrides` with your `GEMINI_API_KEY`.
+
+2. Build and deploy:
+
+   ```bash
+   sam build
+   sam deploy --guided
+   ```
+
+   On first deploy, `--guided` walks through stack name, region, and parameters. Subsequent deploys can use `sam deploy` alone if `samconfig.toml` is present.
+
+3. After deploy, SAM prints the API URL. Example:
+
+   ```bash
+   curl -X POST "https://<api-id>.execute-api.<region>.amazonaws.com/resume/parse" \
+     -F "file=@resume.pdf"
+   ```
+
+### Local Lambda testing
+
+Run the API locally with the Lambda runtime emulator:
+
+```bash
+sam build
+sam local start-api --parameter-overrides GeminiApiKey=$GEMINI_API_KEY
+```
+
+Then call `http://127.0.0.1:3000/resume/parse` as usual.
+
+### Lambda notes
+
+- **Upload limit:** API Gateway HTTP API accepts request bodies up to **6 MB**. The SAM template defaults `MAX_FILE_SIZE_MB` to 6 for this reason. Local uvicorn can use a higher limit.
+- **Timeout:** The function timeout is 120 seconds to allow Gemini API calls to complete.
+- **Memory:** 1024 MB is allocated by default; increase in `template.yaml` if parsing large PDFs is slow.
+- **Environment variables:** Set via SAM parameters / Lambda configuration — not from a `.env` file in the deployment bundle.
+
 ## Example API request
 
 ```bash
@@ -95,4 +149,7 @@ app/
 └── core/
     ├── logging.py
     └── exceptions.py
+handler.py          # AWS Lambda entry point (Mangum)
+template.yaml       # AWS SAM infrastructure template
+.samignore          # Files excluded from Lambda deployment bundle
 ```

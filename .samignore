@@ -1,0 +1,26 @@
+# SAM build artifacts
+.aws-sam/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Tests and dev tooling
+.pytest_cache/
+tests/
+
+# Git and IDE
+.git/
+.gitignore
+.cursor/
+
+# Docs (not needed in the deployment bundle)
+README.md
+*.md
+
+# Local SAM config (may contain account-specific values)
+samconfig.toml

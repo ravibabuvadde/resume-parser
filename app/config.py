@@ -5,7 +5,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+
+# Lambda injects env vars directly; skip .env to avoid overriding them.
+if not os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+    load_dotenv(BASE_DIR / ".env")
 
 
 @dataclass(frozen=True)

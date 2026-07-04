@@ -3,34 +3,29 @@ from typing import List
 from pydantic import BaseModel, Field
 
 
-class SkillsResponse(BaseModel):
-    programming_languages: List[str] = Field(default_factory=list)
-    web_technologies: List[str] = Field(default_factory=list)
-    frameworks: List[str] = Field(default_factory=list)
-    databases: List[str] = Field(default_factory=list)
-    tools: List[str] = Field(default_factory=list)
-    computer_science: List[str] = Field(default_factory=list)
-    machine_learning: List[str] = Field(default_factory=list)
-    soft_skills: List[str] = Field(default_factory=list)
-
-
 class EducationResponse(BaseModel):
     institution: str = ""
     degree: str = ""
-    specialization: str = ""
+    field_of_study: str = ""
+    start_date: str = ""
+    end_date: str = ""
     cgpa: str = ""
 
 
-class InternshipResponse(BaseModel):
-    company: str = ""
-    role: str = ""
+class ExperienceResponse(BaseModel):
+    organization: str = ""
+
+    position: str = ""
+
     duration: str = ""
-    description: List[str] = Field(default_factory=list)
+
+    description: list[str] = []
 
 
 class AchievementResponse(BaseModel):
     title: str = ""
-    type: str = ""
+
+    description: str = ""
 
 
 class CertificationResponse(BaseModel):
@@ -50,14 +45,24 @@ class ResumeParseResponse(BaseModel):
     email: str = ""
     phone: str = ""
     linkedin: str = ""
+
     summary: str = ""
-    skills: SkillsResponse = Field(default_factory=SkillsResponse)
-    education: List[EducationResponse] = Field(default_factory=list)
-    internships: List[InternshipResponse] = Field(default_factory=list)
-    achievements: List[AchievementResponse] = Field(default_factory=list)
-    certifications: List[CertificationResponse] = Field(default_factory=list)
-    projects: List[ProjectResponse] = Field(default_factory=list)
-    hobbies: List[str] = Field(default_factory=list)
+
+    skills: list[str] = []
+
+    education: list[EducationResponse] = []
+
+    experience: list[ExperienceResponse] = []
+
+    projects: list[ProjectResponse] = []
+
+    certifications: list[CertificationResponse] = []
+
+    achievements: list[AchievementResponse] = []
+
+    hobbies: list[str] = []
+
+    additional_info: str = ""
 
 
 class ErrorResponse(BaseModel):

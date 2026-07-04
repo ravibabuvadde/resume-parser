@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Resume Parser API deployed as a serverless FastAPI application on AWS Lambda.
+
+Parameters:
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+    Description: Google Gemini API key
+  ModelName:
+    Type: String
+    Default: gemini-2.5-flash
+    Description: Gemini model name
+  MaxFileSizeMb:
+    Type: Number
+    Default: 6
+    Description: Max upload size in MB (API Gateway limit is 6 MB)
+  AllowedExtensions:
+    Type: String
+    Default: .pdf,.docx
+    Description: Comma-separated allowed file extensions
+
+Globals:
+  Function:
+    Timeout: 120
+    MemorySize: 1024
+    Runtime: python3.12
+    Architectures:
+      - x86_64
+
+Resources:
+  ResumeParserApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - "*"
+
+  ResumeParserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: resume-parser-api
+      Description: Parse resume files and return structured profile data
+      CodeUri: .
+      Handler: handler.handler
+      Environment:
+        Variables:
+          GEMINI_API_KEY: !Ref GeminiApiKey
+          MODEL_NAME: !Ref ModelName
+          ALLOWED_EXTENSIONS: !Ref AllowedExtensions
+          MAX_FILE_SIZE_MB: !Ref MaxFileSizeMb
+      Events:
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ResumeParserApi
+            Path: /
+            Method: ANY
+        Proxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ResumeParserApi
+            Path: /{proxy+}
+            Method: ANY
+    Metadata:
+      BuildMethod: python3.12
+
+Outputs:
+  ApiUrl:
+    Description: Base URL for the Resume Parser API
+    Value: !Sub "https://${ResumeParserApi}.execute-api.${AWS::Region}.amazonaws.com"
+  HealthCheckUrl:
+    Description: Health check endpoint
+    Value: !Sub "https://${ResumeParserApi}.execute-api.${AWS::Region}.amazonaws.com/health"
+  DocsUrl:
+    Description: Swagger UI
+    Value: !Sub "https://${ResumeParserApi}.execute-api.${AWS::Region}.amazonaws.com/docs"
+  ParseEndpoint:
+    Description: Resume parse endpoint
+    Value: !Sub "https://${ResumeParserApi}.execute-api.${AWS::Region}.amazonaws.com/resume/parse"
+  FunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt ResumeParserFunction.Arn
