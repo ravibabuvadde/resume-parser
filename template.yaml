@@ -24,7 +24,7 @@ Globals:
   Function:
     Timeout: 120
     MemorySize: 1024
-    Runtime: python3.12
+    Runtime: python3.14
     Architectures:
       - x86_64
 
@@ -70,7 +70,7 @@ Resources:
             Path: /{proxy+}
             Method: ANY
     Metadata:
-      BuildMethod: python3.12
+      BuildMethod: python3.14
 
 Outputs:
   ApiUrl:
